@@ -1,15 +1,20 @@
 import datetime
+import os.path
 import sys
-
+import csv
 from PySide6 import QtCore, QtWidgets, QtGui
 
 
 class App(QtWidgets.QMainWindow):
-    tasks = []
     checkboxes = []
+    FILENAME = 'tasks_db.csv'
 
     def __init__(self):
         super().__init__()
+
+        # Make sure that the csv file exists.
+        if not os.path.exists(self.FILENAME):
+            open(self.FILENAME, 'x').close()
 
         self.setWindowTitle('To-do')
         self.setFixedSize(800, 500)
@@ -23,6 +28,29 @@ class App(QtWidgets.QMainWindow):
         self.main_widget = QtWidgets.QWidget()
         self.main_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.main_widget)
+        self.read_db()
+
+    def read_db(self):
+        """Read tasks from csv file and create the file if it doesn't exist."""
+        with open(self.FILENAME, 'r', newline='') as csvfile:
+            tasks_reader = csv.reader(csvfile)
+            for task_id, row in enumerate(tasks_reader):
+                self.task_tab.insertRow(task_id)
+                checkbox = QtWidgets.QTableWidgetItem()
+                checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+                checkbox.setCheckState(QtCore.Qt.Unchecked)
+                self.checkboxes.append(checkbox)
+                desc = QtWidgets.QTableWidgetItem(row[0])
+                desc.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+                time_val = QtWidgets.QTableWidgetItem(str(row[2]))
+                time_val.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+                self.task_tab.setItem(task_id, 0, checkbox)  # Column 1 - Checkbox
+                self.task_tab.setItem(task_id, 1, desc)  # Column 2 - Task description
+                # Column 3 - Task comments
+                self.task_tab.setItem(task_id, 3, time_val)  # Column 4 - Start date
+                # Column 5 - End date
+                self.main_widget.update()
 
     def add_menu(self):
         menu_bar = self.menuBar()
@@ -74,20 +102,24 @@ class App(QtWidgets.QMainWindow):
         self.entry.clear()
         if task_text:
             time_created = datetime.datetime.now().strftime('%d/%m/%y')
-            task_id = len(self.tasks)
-            self.tasks.append(task_text)
+            task_id = len(self.checkboxes)
+
+            # Add task to csv file
+            with open(self.FILENAME, 'a', newline='') as csvfile:
+                tasks_writer = csv.DictWriter(csvfile, fieldnames=['Task', 'Comments', 'Start date', 'End date'])
+                tasks_writer.writerow({'Task': task_text, 'Start date': time_created})
 
             self.task_tab.insertRow(task_id)
-            self.checkbox = QtWidgets.QTableWidgetItem()
-            self.checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-            self.checkbox.setCheckState(QtCore.Qt.Unchecked)
-            self.checkboxes.append(self.checkbox)
+            checkbox = QtWidgets.QTableWidgetItem()
+            checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+            checkbox.setCheckState(QtCore.Qt.Unchecked)
+            self.checkboxes.append(checkbox)
             desc = QtWidgets.QTableWidgetItem(task_text)
             desc.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             time_val = QtWidgets.QTableWidgetItem(str(time_created))
             time_val.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
-            self.task_tab.setItem(task_id, 0, self.checkbox)  # Column 1 - Checkbox
+            self.task_tab.setItem(task_id, 0, checkbox)  # Column 1 - Checkbox
             self.task_tab.setItem(task_id, 1, desc)  # Column 2 - Task description
             # Column 3 - Task comments
             self.task_tab.setItem(task_id, 3, time_val)  # Column 4 - Start date
@@ -97,11 +129,17 @@ class App(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def remove_task(self):
-        if self.tasks:
-            for i, val in enumerate(self.checkboxes):
+        if self.checkboxes:
+            for i, val in reversed(list(enumerate(self.checkboxes))):
                 if val.checkState() == QtCore.Qt.CheckState.Checked:
+                    with open(self.FILENAME, 'r', newline='') as csvfile:
+                        rows = [row for row in csv.reader(csvfile)]
+
+                    rows.pop(i)
+                    with open(self.FILENAME, 'w', newline='') as csvfile:
+                        writer = csv.writer(csvfile)
+                        writer.writerows(rows)
                     self.checkboxes.pop(i)
-                    self.tasks.pop(i)
                     self.task_tab.removeRow(i)
             self.main_widget.update()
 
