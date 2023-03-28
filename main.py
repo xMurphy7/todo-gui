@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import os.path
 import sys
 import csv
@@ -20,56 +20,44 @@ class App(QtWidgets.QMainWindow):
         self.setFixedSize(800, 500)
 
         self.main_layout = QtWidgets.QVBoxLayout()
-        self.add_menu()
-        self.add_entry()
-        self.add_todo_list()
-        self.add_remove()
+        self.create_menu()
+        self.create_entry()
+        self.create_todo_list()
+        self.create_remove()
 
         self.main_widget = QtWidgets.QWidget()
         self.main_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.main_widget)
         self.read_db()
 
-    def read_db(self):
-        """Read tasks from csv file and create the file if it doesn't exist."""
-        with open(self.FILENAME, 'r', newline='') as csvfile:
-            tasks_reader = csv.reader(csvfile)
-            for task_id, row in enumerate(tasks_reader):
-                self.task_tab.insertRow(task_id)
-                checkbox = QtWidgets.QTableWidgetItem()
-                checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-                checkbox.setCheckState(QtCore.Qt.Unchecked)
-                self.checkboxes.append(checkbox)
-                desc = QtWidgets.QTableWidgetItem(row[0])
-                desc.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-                time_val = QtWidgets.QTableWidgetItem(str(row[2]))
-                time_val.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-
-                self.task_tab.setItem(task_id, 0, checkbox)  # Column 1 - Checkbox
-                self.task_tab.setItem(task_id, 1, desc)  # Column 2 - Task description
-                # Column 3 - Task comments
-                self.task_tab.setItem(task_id, 3, time_val)  # Column 4 - Start date
-                # Column 5 - End date
-                self.main_widget.update()
-
-    def add_menu(self):
+    def create_menu(self):
+        """Create window's menu"""
         menu_bar = self.menuBar()
         help_menu = menu_bar.addMenu('&Help')
         help_menu.addAction('&Info')
         help_menu.addAction('&Credits')
 
-    def add_entry(self):
+    def create_entry(self):
+        """Create entry section which contains task description, comments, end date and button that calls add_task()."""
         entry_layout = QtWidgets.QHBoxLayout()
-        self.entry = QtWidgets.QLineEdit()
-        self.entry.returnPressed.connect(self.add_task)
+        self.entry_desc = QtWidgets.QLineEdit()
+        self.entry_desc.returnPressed.connect(self.add_task)
+        self.entry_comment = QtWidgets.QLineEdit()
+        self.entry_end = QtWidgets.QCalendarWidget()
+        self.entry_end.setMinimumDate(self.entry_end.selectedDate())
+        self.entry_end.setGridVisible(True)
         add_btn = QtWidgets.QPushButton('Add')
         add_btn.clicked.connect(self.add_task)
-        entry_layout.addWidget(self.entry)
+
+        entry_layout.addWidget(self.entry_desc)
+        entry_layout.addWidget(self.entry_comment)
+        entry_layout.addWidget(self.entry_end)
         entry_layout.addWidget(add_btn)
 
         self.main_layout.addLayout(entry_layout)
 
-    def add_remove(self):
+    def create_remove(self):
+        """Create remove button, that calls remove_task() method."""
         remove_layout = QtWidgets.QHBoxLayout()
         remove_btn = QtWidgets.QPushButton('Remove')
         remove_btn.clicked.connect(self.remove_task)
@@ -77,7 +65,8 @@ class App(QtWidgets.QMainWindow):
 
         self.main_layout.addLayout(remove_layout)
 
-    def add_todo_list(self):
+    def create_todo_list(self):
+        """Create table widget."""
         list_box = QtWidgets.QGroupBox('To-do')
         list_layout = QtWidgets.QHBoxLayout()
 
@@ -96,39 +85,69 @@ class App(QtWidgets.QMainWindow):
 
         self.main_layout.addWidget(list_box)
 
+    def insert_row(self, task_id, row):
+        """Insert data as a row in table.
+        :param task_id id number of the task
+        :param row list which contains description, comment, start date and end date"""
+        self.task_tab.insertRow(task_id)
+        checkbox = QtWidgets.QTableWidgetItem()
+        checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+        checkbox.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        self.checkboxes.append(checkbox)  # Append checkbox to the list, so you can check it's state while removing
+        desc = QtWidgets.QTableWidgetItem(row[0])  # Task description
+        comment = QtWidgets.QTableWidgetItem(row[1])  # Task comment
+        start_date = QtWidgets.QTableWidgetItem(row[2])  # Start date
+        end_date = QtWidgets.QTableWidgetItem(row[3])  # End date
+
+        for cell in [desc, comment, start_date, end_date]:
+            # Align text in cell to center
+            cell.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            # Make the cell non-editable and non-selectable
+            cell.setFlags(cell.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable & ~QtCore.Qt.ItemFlag.ItemIsSelectable)
+
+        self.task_tab.setItem(task_id, 0, checkbox)  # Column 1 - Checkbox
+        self.task_tab.setItem(task_id, 1, desc)  # Column 2 - Task description
+        self.task_tab.setItem(task_id, 2, comment)  # Column 3 - Task comment
+        self.task_tab.setItem(task_id, 3, start_date)  # Column 4 - Start date
+        self.task_tab.setItem(task_id, 4, end_date)  # Column 5 - End date
+
+        # Check if 'end date' has passed.
+        if datetime.strptime(row[3], '%d/%m/%y').date() < datetime.now().date():
+            for j in range(self.task_tab.columnCount()):
+                self.task_tab.item(task_id, j).setBackground(QtGui.QColor('#F85656'))
+
+        self.main_widget.update()
+
+    def read_db(self):
+        """Read tasks from csv file and create the file if it doesn't exist."""
+        with open(self.FILENAME, 'r', newline='') as csvfile:
+            tasks_reader = csv.reader(csvfile)
+            for task_id, row in enumerate(tasks_reader):
+                self.insert_row(task_id, row)
+
     @QtCore.Slot()
     def add_task(self):
-        task_text = self.entry.text().strip()
-        self.entry.clear()
+        """Add the task with information written in entry boxes."""
+        task_text = self.entry_desc.text().strip()  # Task's description
+        self.entry_desc.clear()
         if task_text:
-            time_created = datetime.datetime.now().strftime('%d/%m/%y')
-            task_id = len(self.checkboxes)
+            task_id = len(self.checkboxes)  # Task's ID
+            comment = self.entry_comment.text().strip()  # Task's comment
+            self.entry_comment.clear()
+            start_date = datetime.now().strftime('%d/%m/%y')  # Task's starting date
+            end_date = self.entry_end.selectedDate().toString('dd/MM/yy')  # Task's end date
+            row = [task_text, comment, start_date, end_date]  # List with task information
+
+            self.insert_row(task_id, row)  # Insert row
 
             # Add task to csv file
             with open(self.FILENAME, 'a', newline='') as csvfile:
-                tasks_writer = csv.DictWriter(csvfile, fieldnames=['Task', 'Comments', 'Start date', 'End date'])
-                tasks_writer.writerow({'Task': task_text, 'Start date': time_created})
-
-            self.task_tab.insertRow(task_id)
-            checkbox = QtWidgets.QTableWidgetItem()
-            checkbox.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-            checkbox.setCheckState(QtCore.Qt.Unchecked)
-            self.checkboxes.append(checkbox)
-            desc = QtWidgets.QTableWidgetItem(task_text)
-            desc.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            time_val = QtWidgets.QTableWidgetItem(str(time_created))
-            time_val.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-
-            self.task_tab.setItem(task_id, 0, checkbox)  # Column 1 - Checkbox
-            self.task_tab.setItem(task_id, 1, desc)  # Column 2 - Task description
-            # Column 3 - Task comments
-            self.task_tab.setItem(task_id, 3, time_val)  # Column 4 - Start date
-            # Column 5 - End date
-
-            self.main_widget.update()
+                tasks_writer = csv.writer(csvfile)
+                tasks_writer.writerow([task_text, comment, start_date, end_date])
 
     @QtCore.Slot()
     def remove_task(self):
+        """Remove tasks with checked checkboxes."""
         if self.checkboxes:
             for i, val in reversed(list(enumerate(self.checkboxes))):
                 if val.checkState() == QtCore.Qt.CheckState.Checked:
