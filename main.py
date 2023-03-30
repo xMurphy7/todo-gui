@@ -1,3 +1,4 @@
+import webbrowser
 from datetime import datetime
 import os.path
 import sys
@@ -17,7 +18,7 @@ class App(QtWidgets.QMainWindow):
             open(self.FILENAME, 'x').close()
 
         self.setWindowTitle('To-do')
-        self.setFixedSize(800, 500)
+        self.setFixedSize(800, 515)
 
         self.main_layout = QtWidgets.QVBoxLayout()
         self.create_menu()
@@ -34,25 +35,65 @@ class App(QtWidgets.QMainWindow):
         """Create window's menu"""
         menu_bar = self.menuBar()
         help_menu = menu_bar.addMenu('&Help')
-        help_menu.addAction('&Info')
-        help_menu.addAction('&Credits')
+        info_action = help_menu.addAction('&Info')
+        info_action.triggered.connect(self.menu_info)
+        help_menu.addSeparator()
+        credits_action = help_menu.addAction('Credits')
+        credits_action.triggered.connect(self.menu_credits)
+
+    @QtCore.Slot()
+    def menu_info(self):
+        """Action for 'Info' button that creates a message box with information about the program."""
+        msg = QtWidgets.QMessageBox()
+        msg.setWindowTitle('Info')
+        msg.setText('''This is a simple program that lets you create a to-do list. You can add and remove them from \
+the database.\nWhen adding a new task, you can specify it's description, additional comments and end date.''')
+        msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
+        msg.exec()
+
+    @QtCore.Slot()
+    def menu_credits(self):
+        """Action for 'Credits' button that takes the user to developer's GitHub profile"""
+        webbrowser.open('https://github.com/xMurphy7')
 
     def create_entry(self):
         """Create entry section which contains task description, comments, end date and button that calls add_task()."""
         entry_layout = QtWidgets.QHBoxLayout()
+
+        info_box = QtWidgets.QGroupBox('Task info')
+        info_box.setAlignment(4)
+        info_layout = QtWidgets.QVBoxLayout()
+        desc_label = QtWidgets.QLabel('Description')
         self.entry_desc = QtWidgets.QLineEdit()
         self.entry_desc.returnPressed.connect(self.add_task)
+        comment_label = QtWidgets.QLabel('Comment')
         self.entry_comment = QtWidgets.QLineEdit()
-        self.entry_end = QtWidgets.QCalendarWidget()
-        self.entry_end.setMinimumDate(self.entry_end.selectedDate())
-        self.entry_end.setGridVisible(True)
+        self.entry_comment.returnPressed.connect(self.add_task)
         add_btn = QtWidgets.QPushButton('Add')
         add_btn.clicked.connect(self.add_task)
 
-        entry_layout.addWidget(self.entry_desc)
-        entry_layout.addWidget(self.entry_comment)
-        entry_layout.addWidget(self.entry_end)
-        entry_layout.addWidget(add_btn)
+        cal_layout = QtWidgets.QHBoxLayout()
+        cal_box = QtWidgets.QGroupBox('End date')
+        cal_box.setAlignment(4)
+        self.entry_end = QtWidgets.QCalendarWidget()
+        self.entry_end.setMinimumDate(self.entry_end.selectedDate())
+        self.entry_end.setGridVisible(True)
+        self.entry_end.setLocale(QtCore.QLocale.Language.English)
+
+        info_layout.addWidget(desc_label)
+        info_layout.addWidget(self.entry_desc)
+        info_layout.addStretch()
+        info_layout.addWidget(comment_label)
+        info_layout.addWidget(self.entry_comment)
+        info_layout.addStretch()
+        info_layout.addWidget(add_btn)
+        info_box.setLayout(info_layout)
+
+        cal_layout.addWidget(self.entry_end)
+        cal_box.setLayout(cal_layout)
+
+        entry_layout.addWidget(info_box)
+        entry_layout.addWidget(cal_box)
 
         self.main_layout.addLayout(entry_layout)
 
@@ -71,7 +112,7 @@ class App(QtWidgets.QMainWindow):
         list_layout = QtWidgets.QHBoxLayout()
 
         self.task_tab = QtWidgets.QTableWidget(0, 5)
-        self.task_tab.setHorizontalHeaderLabels(['Done', 'Task', 'Comments', 'Start date', 'End date'])
+        self.task_tab.setHorizontalHeaderLabels(['Done', 'Task', 'Comment', 'Start date', 'End date'])
         h_header = self.task_tab.horizontalHeader()
         h_header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         h_header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)
